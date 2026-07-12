@@ -3,6 +3,14 @@ import { userRepository } from "../repositories/user.repository.js";
 import { sessionRepository } from "../repositories/session.repository.js";
 import { AppError } from "../errors/AppError.js";
 import { ROLE_ID_TO_USER_TYPE, ROLE_VISIBLE_ROLE_IDS } from "../config/roles.js";
+import { cacheGet, cacheSet, cacheDeleteByPrefix } from "../utils/cache.util.js";
+import { sessionCache } from "../utils/sessionCache.util.js";
+
+const USERS_LIST_CACHE_PREFIX = "users:list:";
+const USERS_LIST_CACHE_TTL_SECONDS = 60;
+
+const buildUsersListCacheKey = ({ requesterRoleId, page, limit, search, role_id, user_status, user_type }) =>
+  `${USERS_LIST_CACHE_PREFIX}${requesterRoleId}:${page}:${limit}:${search ?? ""}:${role_id ?? ""}:${user_status ?? ""}:${user_type ?? ""}`;
 
 const toPublicUser = (user) => ({
   user_id: user.user_id,
@@ -30,13 +38,13 @@ export const userService = {
   async createUser(data) {
     const user_type = ROLE_ID_TO_USER_TYPE[data.role_id];
 
-    return sequelize.transaction(async (transaction) => {
+    const user = await sequelize.transaction(async (transaction) => {
       const existing = await userRepository.findByEmail(data.user_email, { transaction });
       if (existing) {
         throw new AppError("A user with this email already exists", 409);
       }
 
-      const user = await userRepository.create(
+      return userRepository.create(
         {
           role_id: data.role_id,
           user_type,
@@ -46,9 +54,13 @@ export const userService = {
         },
         { transaction }
       );
-
-      return toPublicUser(user);
     });
+
+    // A new user can appear on any cached listing page/filter combination,
+    // so the whole listing cache namespace is invalidated rather than one key.
+    await cacheDeleteByPrefix(USERS_LIST_CACHE_PREFIX);
+
+    return toPublicUser(user);
   },
 
   async listUsers({ requesterRoleId, page, limit, search, role_id, user_status, user_type }) {
@@ -56,6 +68,10 @@ export const userService = {
     if (visibleRoleIds.length === 0) {
       return { data: [], meta: { page, limit, total: 0, totalPages: 0 } };
     }
+
+    const cacheKey = buildUsersListCacheKey({ requesterRoleId, page, limit, search, role_id, user_status, user_type });
+    const cached = await cacheGet(cacheKey);
+    if (cached) return cached;
 
     // A role_id filter can only narrow within what the requester is allowed to see
     const roleIdsIn = role_id ? visibleRoleIds.filter((id) => id === role_id) : visibleRoleIds;
@@ -69,10 +85,14 @@ export const userService = {
       roleIdsIn,
     });
 
-    return {
+    const result = {
       data: rows.map(toPublicUser),
       meta: { page, limit, total: count, totalPages: count === 0 ? 0 : Math.ceil(count / limit) },
     };
+
+    await cacheSet(cacheKey, result, USERS_LIST_CACHE_TTL_SECONDS);
+
+    return result;
   },
 
   async getUserById(requesterRoleId, user_id) {
@@ -85,7 +105,7 @@ export const userService = {
   },
 
   async updateUser(requesterRoleId, user_id, data) {
-    return sequelize.transaction(async (transaction) => {
+    const { updated, deactivated } = await sequelize.transaction(async (transaction) => {
       const user = await userRepository.findById(user_id, { transaction });
       if (!user) throw new AppError("User not found", 404);
 
@@ -108,12 +128,17 @@ export const userService = {
         await sessionRepository.endAllForUser(user_id, { transaction });
       }
 
-      return toPublicUser(updated);
+      return { updated, deactivated: data.user_status === "N" };
     });
+
+    await cacheDeleteByPrefix(USERS_LIST_CACHE_PREFIX);
+    if (deactivated) await sessionCache.revokeAllForUser(user_id);
+
+    return toPublicUser(updated);
   },
 
   async deleteUser(requesterRoleId, user_id) {
-    return sequelize.transaction(async (transaction) => {
+    await sequelize.transaction(async (transaction) => {
       const user = await userRepository.findById(user_id, { transaction });
       if (!user) throw new AppError("User not found", 404);
 
@@ -121,8 +146,11 @@ export const userService = {
 
       await userRepository.softDelete(user, { transaction });
       await sessionRepository.endAllForUser(user_id, { transaction });
-
-      return { user_id };
     });
+
+    await cacheDeleteByPrefix(USERS_LIST_CACHE_PREFIX);
+    await sessionCache.revokeAllForUser(user_id);
+
+    return { user_id };
   },
 };

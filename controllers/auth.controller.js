@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import { User, Session } from "../models/index.js";
 import { sendResponse } from "../views/responseHelper.js";
+import { sessionCache } from "../utils/sessionCache.util.js";
 import {
   signAccessToken,
   signRefreshToken,
@@ -25,6 +26,9 @@ const issueTokens = async (user, req) => {
     session_user_agent: req.headers["user-agent"],
     session_expires_at: new Date(exp * 1000),
   });
+
+  const ttlSeconds = exp - Math.floor(Date.now() / 1000);
+  await sessionCache.save(user.user_id, refreshToken, ttlSeconds);
 
   return { accessToken, refreshToken };
 };
@@ -73,11 +77,16 @@ export const refresh = async (req, res) => {
     return sendResponse(res, 401, false, null, "Invalid or expired refresh token");
   }
 
-  const storedSession = await Session.findOne({
-    where: { session_token: refreshToken, user_id: decoded.user_id, session_status: "Y" },
-  });
-  if (!storedSession || storedSession.session_expires_at < new Date()) {
-    return sendResponse(res, 401, false, null, "Refresh token not recognized");
+  // Redis-cached session check (fast path) — a cache miss (including "Redis
+  // is unreachable") falls back to the Postgres check below, unchanged.
+  const cachedActive = await sessionCache.isActive(refreshToken, decoded.user_id);
+  if (!cachedActive) {
+    const storedSession = await Session.findOne({
+      where: { session_token: refreshToken, user_id: decoded.user_id, session_status: "Y" },
+    });
+    if (!storedSession || storedSession.session_expires_at < new Date()) {
+      return sendResponse(res, 401, false, null, "Refresh token not recognized");
+    }
   }
 
   const user = await User.findByPk(decoded.user_id);
@@ -86,7 +95,9 @@ export const refresh = async (req, res) => {
   }
 
   // End this session and start a new one (refresh token rotation)
-  await storedSession.update({ session_status: "N" });
+  await Session.update({ session_status: "N" }, { where: { session_token: refreshToken } });
+  await sessionCache.revoke(decoded.user_id, refreshToken);
+
   const { accessToken, refreshToken: newRefreshToken } = await issueTokens(user, req);
 
   return sendResponse(res, 200, true, { accessToken, refreshToken: newRefreshToken });
@@ -99,6 +110,9 @@ export const logout = async (req, res) => {
       { session_status: "N" },
       { where: { session_token: refreshToken } }
     );
+
+    const decoded = jwt.decode(refreshToken);
+    if (decoded?.user_id) await sessionCache.revoke(decoded.user_id, refreshToken);
   }
   return sendResponse(res, 200, true, null, "Logged out");
 };
