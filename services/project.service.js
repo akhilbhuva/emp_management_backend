@@ -24,12 +24,12 @@ const toPublicProject = (project) => ({
   project_created_at: project.project_created_at,
 });
 
-const MANAGER_ROLE_IDS = [ROLE_IDS.PROJECT_MANAGER, ROLE_IDS.DELIVERY_MANAGER];
+const PROJECT_MANAGER_ROLE_IDS = [ROLE_IDS.PROJECT_MANAGER, ROLE_IDS.DELIVERY_MANAGER];
 
 // Only a project's manager or a Delivery Manager may create/update/delete it
 // (full-field updates) — enforced here so every mutating entry point obeys
 // it, mirroring assertVisible in user.service.js. Team Leads get a narrower
-// path in updateProject (assigned_ids only, see assertTeamLeadScope below).
+// path in updateProject (assigned_ids only, see assertTeamLeadIsProjectMember below).
 const assertManageAccess = (project, { requesterRoleId, requesterUserId }) => {
   if (requesterRoleId === ROLE_IDS.DELIVERY_MANAGER) return;
   if (requesterRoleId === ROLE_IDS.PROJECT_MANAGER && project.project_manager_id === requesterUserId) return;
@@ -39,7 +39,7 @@ const assertManageAccess = (project, { requesterRoleId, requesterUserId }) => {
 
 // A Team Lead may only touch assigned_ids, and only on a project they are
 // already a member of — a PM/DM has to put them on the project first.
-const assertTeamLeadScope = (memberUserIds, requesterUserId) => {
+const assertTeamLeadIsProjectMember = (memberUserIds, requesterUserId) => {
   if (!memberUserIds.includes(requesterUserId)) {
     throw new AppError("Project not found", 404);
   }
@@ -47,7 +47,7 @@ const assertTeamLeadScope = (memberUserIds, requesterUserId) => {
 
 const assertValidManager = async (project_manager_id, { transaction } = {}) => {
   const manager = await userRepository.findById(project_manager_id, { transaction });
-  if (!manager || !MANAGER_ROLE_IDS.includes(manager.role_id)) {
+  if (!manager || !PROJECT_MANAGER_ROLE_IDS.includes(manager.role_id)) {
     throw new AppError("project_manager_id must belong to a Project Manager or Delivery Manager", 422);
   }
 };
@@ -162,7 +162,7 @@ export const projectService = {
         }
 
         const memberUserIds = (project.Members || []).map((member) => member.user_id);
-        assertTeamLeadScope(memberUserIds, requesterUserId);
+        assertTeamLeadIsProjectMember(memberUserIds, requesterUserId);
 
         await projectRepository.update(project, { project_updated_by: requesterUserId }, { transaction });
       } else {

@@ -73,10 +73,10 @@ export const refresh = async (req, res) => {
     return sendResponse(res, 401, false, null, "Invalid or expired refresh token");
   }
 
-  const stored = await Session.findOne({
+  const storedSession = await Session.findOne({
     where: { session_token: refreshToken, user_id: decoded.user_id, session_status: "Y" },
   });
-  if (!stored || stored.session_expires_at < new Date()) {
+  if (!storedSession || storedSession.session_expires_at < new Date()) {
     return sendResponse(res, 401, false, null, "Refresh token not recognized");
   }
 
@@ -86,7 +86,7 @@ export const refresh = async (req, res) => {
   }
 
   // End this session and start a new one (refresh token rotation)
-  await stored.update({ session_status: "N" });
+  await storedSession.update({ session_status: "N" });
   const { accessToken, refreshToken: newRefreshToken } = await issueTokens(user, req);
 
   return sendResponse(res, 200, true, { accessToken, refreshToken: newRefreshToken });

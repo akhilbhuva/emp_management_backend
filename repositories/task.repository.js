@@ -8,7 +8,7 @@ const buildWhereClause = ({
   task_project_id,
   due_before,
   due_after,
-  scope,
+  extraWhere,
 }) => {
   const where = {};
 
@@ -23,7 +23,7 @@ const buildWhereClause = ({
     if (due_before) where.task_due_date[Op.lte] = due_before;
   }
 
-  if (scope) Object.assign(where, scope);
+  if (extraWhere) Object.assign(where, extraWhere);
 
   return where;
 };
@@ -43,7 +43,7 @@ const employeeInclude = {
   attributes: ["user_id", "user_name", "user_email"],
   required: false,
 };
-const managerInclude = {
+const taskManagerInclude = {
   model: User,
   as: "AssignedManager",
   attributes: ["user_id", "user_name", "user_email"],
@@ -61,7 +61,7 @@ export const taskRepository = {
     task_project_id,
     due_before,
     due_after,
-    scope,
+    extraWhere,
   }) {
     const where = buildWhereClause({
       search,
@@ -70,7 +70,7 @@ export const taskRepository = {
       task_project_id,
       due_before,
       due_after,
-      scope,
+      extraWhere,
     });
     const offset = (page - 1) * limit;
 
@@ -80,13 +80,13 @@ export const taskRepository = {
       offset,
       distinct: true,
       order: [["task_id", "DESC"]],
-      include: [projectInclude, employeeInclude, managerInclude],
+      include: [projectInclude, employeeInclude, taskManagerInclude],
     });
   },
 
   async findById(task_id, { transaction } = {}) {
     return Task.findByPk(task_id, {
-      include: [projectInclude, employeeInclude, managerInclude],
+      include: [projectInclude, employeeInclude, taskManagerInclude],
       transaction,
     });
   },

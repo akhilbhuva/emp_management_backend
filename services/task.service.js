@@ -7,7 +7,7 @@ import { userRepository } from "../repositories/user.repository.js";
 import { AppError } from "../errors/AppError.js";
 import { ROLE_IDS, ROLE_VISIBLE_ROLE_IDS } from "../config/roles.js";
 
-const MANAGER_ROLE_IDS = [ROLE_IDS.TEAM_LEAD, ROLE_IDS.PROJECT_MANAGER, ROLE_IDS.DELIVERY_MANAGER];
+const TASK_MANAGER_ROLE_IDS = [ROLE_IDS.TEAM_LEAD, ROLE_IDS.PROJECT_MANAGER, ROLE_IDS.DELIVERY_MANAGER];
 
 const toPublicTask = (task) => ({
   task_id: task.task_id,
@@ -28,8 +28,8 @@ const toPublicTask = (task) => ({
 });
 
 // Whether a requester may create/edit tasks on a given project — mirrors
-// project.service's assertManageAccess/assertTeamLeadScope: DM always,
-// PM only for projects they manage, TL only for projects they're a member of.
+// project.service's assertManageAccess/assertTeamLeadIsProjectMember: DM
+// always, PM only for projects they manage, TL only for projects they're a member of.
 const assertProjectTaskAccess = (project, { requesterRoleId, requesterUserId }) => {
   if (requesterRoleId === ROLE_IDS.DELIVERY_MANAGER) return;
   if (requesterRoleId === ROLE_IDS.PROJECT_MANAGER && project.project_manager_id === requesterUserId) return;
@@ -56,7 +56,7 @@ const assertValidAssignedEmployee = async (task_project_id, employee_id, { trans
 
 const assertValidAssignedManager = async (manager_id, { transaction } = {}) => {
   const manager = await userRepository.findById(manager_id, { transaction });
-  if (!manager || !MANAGER_ROLE_IDS.includes(manager.role_id)) {
+  if (!manager || !TASK_MANAGER_ROLE_IDS.includes(manager.role_id)) {
     throw new AppError("task_assigned_manager_id must belong to a Team Lead, Project Manager or Delivery Manager", 422);
   }
 };
@@ -105,25 +105,26 @@ export const taskService = {
   },
 
   async listTasks({ requesterUserId, requesterRoleId, page, limit, search, task_status, task_priority, task_project_id, due_before, due_after }) {
-    // Scope built with Sequelize operators directly (kept out of the
-    // repository's generic where-builder since the OR logic differs per role).
-    let scope;
+    // Extra where-conditions layered on top of the filter params, built with
+    // Sequelize operators directly (kept out of the repository's generic
+    // where-builder since the OR logic differs per role).
+    let extraWhere;
     if (requesterRoleId === ROLE_IDS.EMPLOYEE) {
-      scope = { task_assigned_employee_id: requesterUserId };
+      extraWhere = { task_assigned_employee_id: requesterUserId };
     } else if (requesterRoleId === ROLE_IDS.PROJECT_MANAGER) {
-      scope = {
+      extraWhere = {
         [Op.or]: [{ task_assigned_manager_id: requesterUserId }, { "$Project.project_manager_id$": requesterUserId }],
       };
     } else if (requesterRoleId === ROLE_IDS.TEAM_LEAD) {
       const memberProjectIds = await projectAssignmentRepository.listProjectIdsForUser(requesterUserId);
-      scope = {
+      extraWhere = {
         [Op.or]: [
           { task_assigned_manager_id: requesterUserId },
           { task_project_id: { [Op.in]: memberProjectIds.length ? memberProjectIds : [-1] } },
         ],
       };
     }
-    // DELIVERY_MANAGER: scope stays undefined -> sees everything
+    // DELIVERY_MANAGER: extraWhere stays undefined -> sees everything
 
     const { rows, count } = await taskRepository.findAndCountAll({
       page,
@@ -134,7 +135,7 @@ export const taskService = {
       task_project_id,
       due_before,
       due_after,
-      scope,
+      extraWhere,
     });
 
     return {
@@ -212,7 +213,7 @@ export const taskService = {
       task_status,
       task_priority,
       task_project_id,
-      scope: { task_assigned_employee_id: employee_id },
+      extraWhere: { task_assigned_employee_id: employee_id },
     });
 
     return {
@@ -224,10 +225,10 @@ export const taskService = {
   async getTasksForManager(manager_id, { requesterUserId, requesterRoleId, page, limit, task_status, task_priority, task_project_id }) {
     if (requesterRoleId === ROLE_IDS.DELIVERY_MANAGER) {
       const manager = await userRepository.findById(manager_id);
-      if (!manager || !MANAGER_ROLE_IDS.includes(manager.role_id)) {
+      if (!manager || !TASK_MANAGER_ROLE_IDS.includes(manager.role_id)) {
         throw new AppError("Manager not found", 404);
       }
-    } else if (MANAGER_ROLE_IDS.includes(requesterRoleId)) {
+    } else if (TASK_MANAGER_ROLE_IDS.includes(requesterRoleId)) {
       if (manager_id !== requesterUserId) throw new AppError("Manager not found", 404);
     } else {
       throw new AppError("Manager not found", 404);
@@ -239,7 +240,7 @@ export const taskService = {
       task_status,
       task_priority,
       task_project_id,
-      scope: { task_assigned_manager_id: manager_id },
+      extraWhere: { task_assigned_manager_id: manager_id },
     });
 
     return {

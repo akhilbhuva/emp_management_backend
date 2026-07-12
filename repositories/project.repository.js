@@ -23,7 +23,7 @@ const buildWhereClause = ({ search, project_status, managerIds, memberProjectIds
 // required: false on both — otherwise Sequelize defaults to an INNER JOIN
 // here because User.defaultScope carries a `where`, which would silently
 // drop projects that have no manager yet or no members yet.
-const managerInclude = {
+const projectManagerInclude = {
   model: User,
   as: "Manager",
   attributes: ["user_id", "user_name", "user_email"],
@@ -55,13 +55,13 @@ export const projectRepository = {
       offset,
       distinct: true,
       order: [["project_id", "DESC"]],
-      include: [managerInclude],
+      include: [projectManagerInclude],
     });
   },
 
   async findById(project_id, { transaction } = {}) {
     return Project.findByPk(project_id, {
-      include: [managerInclude, memberInclude],
+      include: [projectManagerInclude, memberInclude],
       transaction,
     });
   },
