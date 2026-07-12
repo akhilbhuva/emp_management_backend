@@ -1,4 +1,5 @@
 import { getRedis } from "../config/redis.js";
+import { logger } from "../config/logger.js";
 
 const DEFAULT_TTL_SECONDS = 60;
 
@@ -10,7 +11,7 @@ export const cacheGet = async (key) => {
     const raw = await getRedis().get(key);
     return raw ? JSON.parse(raw) : null;
   } catch (error) {
-    console.error(`Redis GET failed for ${key}:`, error.message);
+    logger.warn(`Redis GET failed for ${key}: ${error.message}`);
     return null;
   }
 };
@@ -19,7 +20,7 @@ export const cacheSet = async (key, value, ttlSeconds = DEFAULT_TTL_SECONDS) => 
   try {
     await getRedis().set(key, JSON.stringify(value), "EX", ttlSeconds);
   } catch (error) {
-    console.error(`Redis SET failed for ${key}:`, error.message);
+    logger.warn(`Redis SET failed for ${key}: ${error.message}`);
   }
 };
 
@@ -41,6 +42,6 @@ export const cacheDeleteByPrefix = async (prefix) => {
 
     if (keysToDelete.length) await redis.del(...keysToDelete);
   } catch (error) {
-    console.error(`Redis SCAN/DEL failed for prefix ${prefix}:`, error.message);
+    logger.warn(`Redis SCAN/DEL failed for prefix ${prefix}: ${error.message}`);
   }
 };

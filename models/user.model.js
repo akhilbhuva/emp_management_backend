@@ -58,6 +58,10 @@ const User = sequelize.define(
     defaultScope: {
       where: { user_isdeleted: "N" },
     },
+    // role_id and user_status are the columns every user listing filters on
+    // (see repositories/user.repository.js); user_email is already indexed
+    // via its unique constraint above.
+    indexes: [{ fields: ["role_id"] }, { fields: ["user_status"] }],
     hooks: {
       beforeCreate: async (user) => {
         user.user_password = await bcrypt.hash(user.user_password, 10);

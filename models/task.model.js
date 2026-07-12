@@ -88,6 +88,15 @@ const Task = sequelize.define(
     defaultScope: {
       where: { task_isdeleted: "N" },
     },
+    // Every task listing/scoping query (see repositories/task.repository.js
+    // and services/task.service.js) filters or joins on these columns.
+    indexes: [
+      { fields: ["task_project_id"] },
+      { fields: ["task_assigned_employee_id"] },
+      { fields: ["task_assigned_manager_id"] },
+      { fields: ["task_status"] },
+      { fields: ["task_priority"] },
+    ],
   }
 );
 

@@ -70,6 +70,10 @@ const Project = sequelize.define(
     defaultScope: {
       where: { project_isdeleted: "N" },
     },
+    // project_manager_id and project_status are the two columns every
+    // project listing/scoping query filters or joins on (see
+    // repositories/project.repository.js and services/project.service.js).
+    indexes: [{ fields: ["project_manager_id"] }, { fields: ["project_status"] }],
   }
 );
 

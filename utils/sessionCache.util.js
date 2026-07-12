@@ -1,4 +1,5 @@
 import { getRedis } from "../config/redis.js";
+import { logger } from "../config/logger.js";
 
 const tokenKey = (token) => `session:token:${token}`;
 const userSessionsKey = (user_id) => `session:user:${user_id}`;
@@ -17,7 +18,7 @@ export const sessionCache = {
       await redis.sadd(userSessionsKey(user_id), token);
       await redis.expire(userSessionsKey(user_id), ttlSeconds);
     } catch (error) {
-      console.error("Redis session save failed:", error.message);
+      logger.warn(`Redis session save failed: ${error.message}`);
     }
   },
 
@@ -28,7 +29,7 @@ export const sessionCache = {
       const storedUserId = await getRedis().get(tokenKey(token));
       return storedUserId !== null && Number(storedUserId) === user_id;
     } catch (error) {
-      console.error("Redis session lookup failed:", error.message);
+      logger.warn(`Redis session lookup failed: ${error.message}`);
       return false;
     }
   },
@@ -39,7 +40,7 @@ export const sessionCache = {
       await redis.del(tokenKey(token));
       await redis.srem(userSessionsKey(user_id), token);
     } catch (error) {
-      console.error("Redis session revoke failed:", error.message);
+      logger.warn(`Redis session revoke failed: ${error.message}`);
     }
   },
 
@@ -52,7 +53,7 @@ export const sessionCache = {
       if (tokens.length) await redis.del(...tokens.map(tokenKey));
       await redis.del(userSessionsKey(user_id));
     } catch (error) {
-      console.error("Redis session revokeAll failed:", error.message);
+      logger.warn(`Redis session revokeAll failed: ${error.message}`);
     }
   },
 };

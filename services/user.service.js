@@ -5,6 +5,7 @@ import { AppError } from "../errors/AppError.js";
 import { ROLE_ID_TO_USER_TYPE, ROLE_VISIBLE_ROLE_IDS } from "../config/roles.js";
 import { cacheGet, cacheSet, cacheDeleteByPrefix } from "../utils/cache.util.js";
 import { sessionCache } from "../utils/sessionCache.util.js";
+import { buildPaginationMeta } from "../utils/pagination.util.js";
 
 const USERS_LIST_CACHE_PREFIX = "users:list:";
 const USERS_LIST_CACHE_TTL_SECONDS = 60;
@@ -87,7 +88,7 @@ export const userService = {
 
     const result = {
       data: rows.map(toPublicUser),
-      meta: { page, limit, total: count, totalPages: count === 0 ? 0 : Math.ceil(count / limit) },
+      meta: buildPaginationMeta({ page, limit, total: count }),
     };
 
     await cacheSet(cacheKey, result, USERS_LIST_CACHE_TTL_SECONDS);

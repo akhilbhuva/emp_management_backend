@@ -40,6 +40,13 @@ const ProjectAssignment = sequelize.define(
     defaultScope: {
       where: { assignment_isdeleted: "N" },
     },
+    // Composite index covers findActiveMembership's (project_id, user_id)
+    // lookup and listActiveUserIds' project_id-only lookup; the separate
+    // user_id index covers listProjectIdsForUser's reverse lookup.
+    indexes: [
+      { fields: ["assignment_project_id", "assignment_user_id"] },
+      { fields: ["assignment_user_id"] },
+    ],
   }
 );
 

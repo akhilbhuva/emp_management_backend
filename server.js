@@ -7,6 +7,7 @@ import { connectRedis } from "./config/redis.js";
 import { initSocket } from "./config/socket.js";
 import "./models/index.js"; // register models + associations before sync
 import { seedRoles } from "./seeders/role.seeder.js";
+import { logger } from "./config/logger.js";
 
 const PORT = process.env.PORT || 5000;
 
@@ -24,13 +25,16 @@ const startServer = async () => {
 
   // Sync Sequelize models (use { alter: true } in dev for auto-migration)
   await sequelize.sync({ alter: process.env.NODE_ENV === "development" });
-  console.log("✅ Database synced");
+  logger.info("Database synced");
 
   await seedRoles();
 
   server.listen(PORT, () => {
-    console.log(`🚀 Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+    logger.info(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
   });
 };
 
-startServer();
+startServer().catch((err) => {
+  logger.error("Server failed to start", { error: err });
+  process.exit(1);
+});

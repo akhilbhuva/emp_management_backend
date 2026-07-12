@@ -1,5 +1,6 @@
 import { Role } from "../models/index.js";
 import { ROLE_SEED } from "../config/roles.js";
+import { logger } from "../config/logger.js";
 
 export const seedRoles = async () => {
   for (const role of ROLE_SEED) {
@@ -8,5 +9,5 @@ export const seedRoles = async () => {
       defaults: role,
     });
   }
-  console.log("✅ Roles seeded (Team Lead, Project Manager, Delivery Manager, Employee)");
+  logger.info("Roles seeded (Team Lead, Project Manager, Delivery Manager, Employee)");
 };

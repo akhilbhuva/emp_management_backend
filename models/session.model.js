@@ -55,6 +55,9 @@ const Session = sequelize.define(
     defaultScope: {
       where: { session_isdeleted: "N" },
     },
+    // Covers sessionRepository.endAllForUser's (user_id, session_status)
+    // lookup; session_token is already indexed via its unique constraint above.
+    indexes: [{ fields: ["user_id", "session_status"] }],
   }
 );
 

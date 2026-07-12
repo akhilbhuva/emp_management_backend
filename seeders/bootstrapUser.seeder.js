@@ -6,6 +6,7 @@ import { sequelize } from "../config/db.js";
 import { seedRoles } from "./role.seeder.js";
 import { User } from "../models/index.js";
 import { ROLE_IDS, USER_TYPES } from "../config/roles.js";
+import { logger } from "../config/logger.js";
 
 const run = async () => {
   await sequelize.authenticate();
@@ -17,7 +18,7 @@ const run = async () => {
 
   const existing = await User.findOne({ where: { user_email: email } });
   if (existing) {
-    console.log(`ℹ️  User ${email} already exists, skipping.`);
+    logger.info(`User ${email} already exists, skipping.`);
     process.exit(0);
   }
 
@@ -29,11 +30,11 @@ const run = async () => {
     user_password: password,
   });
 
-  console.log(`✅ Bootstrap Delivery Manager created — email: ${email}, password: ${password}`);
+  logger.info(`Bootstrap Delivery Manager created — email: ${email}, password: ${password}`);
   process.exit(0);
 };
 
 run().catch((err) => {
-  console.error("❌ Seeding failed:", err);
+  logger.error("Seeding failed", { error: err });
   process.exit(1);
 });

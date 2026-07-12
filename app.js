@@ -1,7 +1,7 @@
 import "./config/env.js";
 
 import express from "express";
-import { logger } from "./middlewares/logger.js";
+import { requestLogger } from "./middlewares/logger.js";
 import { errorHandler } from "./middlewares/errorHandler.middleware.js";
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
@@ -13,7 +13,7 @@ const app = express();
 // ── Middleware ──────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(logger);
+app.use(requestLogger);
 
 // ── Routes ─────────────────────────────────────────────
 app.get("/", (req, res) => {

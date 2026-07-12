@@ -1,5 +1,6 @@
 import { Server } from "socket.io";
 import { verifyAccessToken } from "../utils/jwt.util.js";
+import { logger } from "./logger.js";
 
 let io;
 
@@ -30,10 +31,10 @@ export const initSocket = (httpServer) => {
     // Personal room — lets emitToUser reach every tab/device a user has open
     // without this module having to track socket ids itself.
     socket.join(`user:${user_id}`);
-    console.log(`🔌 Client connected: ${socket.id} (user ${user_id})`);
+    logger.debug(`Socket connected: ${socket.id} (user ${user_id})`);
 
     socket.on("disconnect", () => {
-      console.log(`❌ Client disconnected: ${socket.id} (user ${user_id})`);
+      logger.debug(`Socket disconnected: ${socket.id} (user ${user_id})`);
     });
   });
 

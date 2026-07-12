@@ -7,6 +7,7 @@ import { userRepository } from "../repositories/user.repository.js";
 import { notificationService } from "./notification.service.js";
 import { AppError } from "../errors/AppError.js";
 import { ROLE_IDS, ROLE_VISIBLE_ROLE_IDS } from "../config/roles.js";
+import { buildPaginationMeta } from "../utils/pagination.util.js";
 
 const TASK_MANAGER_ROLE_IDS = [ROLE_IDS.TEAM_LEAD, ROLE_IDS.PROJECT_MANAGER, ROLE_IDS.DELIVERY_MANAGER];
 
@@ -147,7 +148,7 @@ export const taskService = {
 
     return {
       data: rows.map(toPublicTask),
-      meta: { page, limit, total: count, totalPages: count === 0 ? 0 : Math.ceil(count / limit) },
+      meta: buildPaginationMeta({ page, limit, total: count }),
     };
   },
 
@@ -247,7 +248,7 @@ export const taskService = {
 
     return {
       data: rows.map(toPublicTask),
-      meta: { page, limit, total: count, totalPages: count === 0 ? 0 : Math.ceil(count / limit) },
+      meta: buildPaginationMeta({ page, limit, total: count }),
     };
   },
 
@@ -274,7 +275,7 @@ export const taskService = {
 
     return {
       data: rows.map(toPublicTask),
-      meta: { page, limit, total: count, totalPages: count === 0 ? 0 : Math.ceil(count / limit) },
+      meta: buildPaginationMeta({ page, limit, total: count }),
     };
   },
 };

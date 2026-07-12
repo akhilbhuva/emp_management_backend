@@ -5,4 +5,6 @@
 // same file does NOT guarantee it runs first.
 import dotenv from "dotenv";
 
-dotenv.config({ override: true });
+// quiet: true suppresses dotenv's promotional "tip" line on every boot —
+// noise we don't want mixed into structured application logs.
+dotenv.config({ override: true, quiet: true });

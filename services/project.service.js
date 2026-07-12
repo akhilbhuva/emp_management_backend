@@ -4,6 +4,7 @@ import { projectAssignmentRepository } from "../repositories/projectAssignment.r
 import { userRepository } from "../repositories/user.repository.js";
 import { AppError } from "../errors/AppError.js";
 import { ROLE_IDS } from "../config/roles.js";
+import { buildPaginationMeta } from "../utils/pagination.util.js";
 
 const toPublicProject = (project) => ({
   project_id: project.project_id,
@@ -133,7 +134,7 @@ export const projectService = {
 
     return {
       data: rows.map(toPublicProject),
-      meta: { page, limit, total: count, totalPages: count === 0 ? 0 : Math.ceil(count / limit) },
+      meta: buildPaginationMeta({ page, limit, total: count }),
     };
   },
 
