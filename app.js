@@ -5,6 +5,7 @@ import { logger } from "./middlewares/logger.js";
 import { errorHandler } from "./middlewares/errorHandler.middleware.js";
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
+import projectRoutes from "./routes/project.routes.js";
 
 const app = express();
 
@@ -20,6 +21,7 @@ app.get("/", (req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/projects", projectRoutes);
 
 // ── Error handler (must be last) ────────────────────────
 app.use(errorHandler);

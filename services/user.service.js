@@ -101,7 +101,6 @@ export const userService = {
         assertVisible(requesterRoleId, data.role_id);
         updateData.user_type = ROLE_ID_TO_USER_TYPE[data.role_id];
       }
-
       const updated = await userRepository.update(user, updateData, { transaction });
 
       // Deactivating a user must also end their active sessions, atomically

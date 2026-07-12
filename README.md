@@ -1,7 +1,7 @@
 # Employee Management Backend
 
 Backend API for an employee task management system. Roles: Team Lead, Project
-Manager, Delivery Manager, Employee — all stored in a single `tbl_user` table.
+Manager, Delivery Manager, Employee — all stored in a single `tbl_users` table.
 
 ## Tech stack
 
@@ -12,9 +12,11 @@ Manager, Delivery Manager, Employee — all stored in a single `tbl_user` table.
 
 ## Database naming convention
 
-- Every table name starts with `tbl_` (e.g. `tbl_role`, `tbl_user`, `tbl_session`).
-- Every column is prefixed with its table name (e.g. `tbl_user.user_email`),
-  including timestamps (`user_created_at` / `user_updated_at`).
+- Every table name starts with `tbl_` (e.g. `tbl_role`, `tbl_users`, `tbl_session`).
+- Every column is prefixed with its table's singular resource name (e.g.
+  `tbl_users.user_email`), including timestamps (`user_created_at` /
+  `user_updated_at`) — the table name may be pluralized, but column prefixes
+  stay singular.
 - Boolean-style flags use `Y` / `N`, not `true`/`false` or `active`/`inactive`:
   - `user_status`: `Y` = active, `N` = inactive
   - `session_status`: `Y` = session active (logged in), `N` = ended
@@ -25,11 +27,13 @@ Manager, Delivery Manager, Employee — all stored in a single `tbl_user` table.
 
 ## Tables
 
-| Table          | Purpose                                                             |
-|----------------|----------------------------------------------------------------------|
-| `tbl_role`     | Lookup table for the 4 roles (`role_id` 1–4)                        |
-| `tbl_user`     | All users regardless of role (`user_type`: T/P/D/E)                 |
-| `tbl_session`  | One row per login — refresh token, IP address, user agent, status   |
+| Table                    | Purpose                                                             |
+|--------------------------|----------------------------------------------------------------------|
+| `tbl_role`               | Lookup table for the 4 roles (`role_id` 1–4)                        |
+| `tbl_users`               | All users regardless of role (`user_type`: T/P/D/E)                 |
+| `tbl_session`             | One row per login — refresh token, IP address, user agent, status   |
+| `tbl_project`             | Projects (`project_status`: P/A/C/H/X — pending/active/completed/on hold/cancelled) |
+| `tbl_project_assignment`  | Join table — which users are assigned to which projects             |
 
 Role IDs: `1` = Team Lead (`T`), `2` = Project Manager (`P`),
 `3` = Delivery Manager (`D`), `4` = Employee (`E`).
@@ -100,6 +104,11 @@ email already exists.
 | POST   | `/api/auth/logout`  | none (refresh token in body)    | Ends the session                  |
 | GET    | `/api/users`        | Bearer access token             | List users                        |
 | POST   | `/api/users`        | Bearer token, Delivery Manager  | Create a new user                 |
+| GET    | `/api/projects/getAll` | Bearer access token          | List projects visible to the requester |
+| GET    | `/api/projects/getOne/:id` | Bearer access token      | Get one project (manager, member, or Delivery Manager only) |
+| POST   | `/api/projects/create` | Bearer token, Project Manager or Delivery Manager | Create a project (optional `assigned_ids: []` to set initial members) |
+| PUT    | `/api/projects/update/:id` | Bearer token, Project Manager/Delivery Manager (any field), or Team Lead (`assigned_ids` only, and only if already a member of that project) | Update a project; sending `assigned_ids: []` syncs project membership to exactly that list — no separate assign/unassign call needed |
+| DELETE | `/api/projects/delete/:id` | Bearer token, Project Manager or Delivery Manager | Soft-delete a project |
 
 Access tokens go in `Authorization: Bearer <token>`. Access tokens are
 short-lived (`JWT_EXPIRES_IN`, default 15m); use `/api/auth/refresh` with the

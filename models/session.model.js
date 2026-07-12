@@ -13,7 +13,7 @@ const Session = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
-        model: "tbl_user",
+        model: "tbl_users",
         key: "user_id",
       },
     },
