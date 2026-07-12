@@ -51,6 +51,11 @@ export const userRepository = {
     return User.findOne({ where: { user_email }, transaction });
   },
 
+  async listIdsByRole(role_id) {
+    const rows = await User.findAll({ where: { role_id }, attributes: ["user_id"] });
+    return rows.map((row) => row.user_id);
+  },
+
   async create(data, { transaction } = {}) {
     return User.create(data, { transaction });
   },

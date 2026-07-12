@@ -34,7 +34,7 @@ const buildWhereClause = ({
 const projectInclude = {
   model: Project,
   as: "Project",
-  attributes: ["project_id", "project_name"],
+  attributes: ["project_id", "project_name", "project_manager_id"],
   required: false,
 };
 const employeeInclude = {

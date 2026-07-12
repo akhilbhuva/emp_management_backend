@@ -4,6 +4,7 @@ import { taskRepository } from "../repositories/task.repository.js";
 import { projectRepository } from "../repositories/project.repository.js";
 import { projectAssignmentRepository } from "../repositories/projectAssignment.repository.js";
 import { userRepository } from "../repositories/user.repository.js";
+import { notificationService } from "./notification.service.js";
 import { AppError } from "../errors/AppError.js";
 import { ROLE_IDS, ROLE_VISIBLE_ROLE_IDS } from "../config/roles.js";
 
@@ -73,7 +74,7 @@ const assertTaskVisible = (task, { requesterUserId, requesterRoleId }) => {
 
 export const taskService = {
   async createTask(data, { requesterUserId, requesterRoleId }) {
-    return sequelize.transaction(async (transaction) => {
+    const full = await sequelize.transaction(async (transaction) => {
       const project = await projectRepository.findById(data.task_project_id, { transaction });
       if (!project) throw new AppError("Project not found", 404);
       assertProjectTaskAccess(project, { requesterRoleId, requesterUserId });
@@ -99,9 +100,15 @@ export const taskService = {
         { transaction }
       );
 
-      const full = await taskRepository.findById(task.task_id, { transaction });
-      return toPublicTask(full);
+      return taskRepository.findById(task.task_id, { transaction });
     });
+
+    const publicTask = toPublicTask(full);
+    // Fired only after the transaction commits, so we never notify about a
+    // task creation that ends up rolled back.
+    notificationService.notifyTaskAssigned({ employeeId: full.task_assigned_employee_id, task: publicTask });
+
+    return publicTask;
   },
 
   async listTasks({ requesterUserId, requesterRoleId, page, limit, search, task_status, task_priority, task_project_id, due_before, due_after }) {
@@ -154,7 +161,7 @@ export const taskService = {
   },
 
   async updateTask(task_id, data, { requesterUserId, requesterRoleId }) {
-    return sequelize.transaction(async (transaction) => {
+    const full = await sequelize.transaction(async (transaction) => {
       const task = await taskRepository.findById(task_id, { transaction });
       if (!task) throw new AppError("Task not found", 404);
 
@@ -173,13 +180,21 @@ export const taskService = {
       const { task_created_by, task_updated_by, task_project_id, ...fields } = data;
       await taskRepository.update(task, { ...fields, task_updated_by: requesterUserId }, { transaction });
 
-      const full = await taskRepository.findById(task_id, { transaction });
-      return toPublicTask(full);
+      return taskRepository.findById(task_id, { transaction });
     });
+
+    const publicTask = toPublicTask(full);
+    // A manager (re)assigning an employee to this task is Scenario 1, same
+    // as on creation — notify the (possibly new) assigned employee.
+    if (data.task_assigned_employee_id !== undefined) {
+      notificationService.notifyTaskAssigned({ employeeId: full.task_assigned_employee_id, task: publicTask });
+    }
+
+    return publicTask;
   },
 
   async updateTaskStatus(task_id, { task_status }, { requesterUserId, requesterRoleId }) {
-    return sequelize.transaction(async (transaction) => {
+    const { full, isOwnTask } = await sequelize.transaction(async (transaction) => {
       const task = await taskRepository.findById(task_id, { transaction });
       if (!task) throw new AppError("Task not found", 404);
 
@@ -192,8 +207,22 @@ export const taskService = {
       await taskRepository.update(task, { task_status, task_updated_by: requesterUserId }, { transaction });
 
       const full = await taskRepository.findById(task_id, { transaction });
-      return toPublicTask(full);
+      return { full, isOwnTask };
     });
+
+    const publicTask = toPublicTask(full);
+    // Scenario 2: the assigned employee (not a manager) changed the task ->
+    // notify every manager in the hierarchy above them.
+    if (isOwnTask) {
+      await notificationService.notifyTaskUpdated({
+        actorUserId: requesterUserId,
+        assignedManagerId: full.task_assigned_manager_id,
+        projectManagerId: full.Project?.project_manager_id,
+        task: publicTask,
+      });
+    }
+
+    return publicTask;
   },
 
   async getTasksForEmployee(employee_id, { requesterUserId, requesterRoleId, page, limit, task_status, task_priority, task_project_id }) {
