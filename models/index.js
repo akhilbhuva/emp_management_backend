@@ -3,6 +3,7 @@ import User from "./user.model.js";
 import Session from "./session.model.js";
 import Project from "./project.model.js";
 import ProjectAssignment from "./projectAssignment.model.js";
+import Task from "./task.model.js";
 
 Role.hasMany(User, { foreignKey: "role_id" });
 User.belongsTo(Role, { foreignKey: "role_id" });
@@ -26,4 +27,13 @@ User.belongsToMany(Project, {
   as: "Projects",
 });
 
-export { Role, User, Session, Project, ProjectAssignment };
+Project.hasMany(Task, { foreignKey: "task_project_id", as: "Tasks" });
+Task.belongsTo(Project, { foreignKey: "task_project_id", as: "Project" });
+
+User.hasMany(Task, { foreignKey: "task_assigned_employee_id", as: "AssignedTasks" });
+Task.belongsTo(User, { foreignKey: "task_assigned_employee_id", as: "AssignedEmployee" });
+
+User.hasMany(Task, { foreignKey: "task_assigned_manager_id", as: "ManagedTasks" });
+Task.belongsTo(User, { foreignKey: "task_assigned_manager_id", as: "AssignedManager" });
+
+export { Role, User, Session, Project, ProjectAssignment, Task };
